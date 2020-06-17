@@ -1,0 +1,10 @@
+<resources>
+	<string name="app_name">Online GPS Tracker</string>
+    <string name="button_start">Start</string>
+    <string name="main_key">Key</string>
+    <string name="main_interval">Interval (s)</string>
+    <string name="main_interval_default_value">10</string>
+    <string name="main_stop">Stop</string>
+    <string name="main_copy_link">Copy link</string>
+    <string name="main_endpoint">Endpoint</string>
+</resources>
