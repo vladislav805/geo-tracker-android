@@ -17,7 +17,7 @@
 			app:layout_constraintEnd_toEndOf="parent"
 			app:layout_constraintHorizontal_bias="0.0"
 			app:layout_constraintTop_toTopOf="@+id/tv_endpoint"
-			app:layout_constraintBottom_toBottomOf="@+id/tv_endpoint"/>
+			app:layout_constraintBottom_toBottomOf="@+id/tv_endpoint" android:textColor="@color/colorText"/>
 	<TextView
 			android:text="@string/main_endpoint"
 			android:layout_width="wrap_content"
@@ -40,10 +40,10 @@
 			android:ems="10"
 			android:id="@+id/etv_key"
 			app:layout_constraintStart_toStartOf="@+id/guideline"
-			app:layout_constraintEnd_toEndOf="parent"
 			app:layout_constraintTop_toTopOf="@+id/tv_key"
-			app:layout_constraintBottom_toBottomOf="@+id/tv_key" app:layout_constraintHorizontal_bias="0.0"
-	/>
+			app:layout_constraintBottom_toBottomOf="@+id/tv_key"
+			app:layout_constraintEnd_toStartOf="@+id/button_generate" android:layout_marginEnd="8dp"
+			android:textColor="@color/colorText"/>
 	<EditText
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
@@ -55,7 +55,7 @@
 			app:layout_constraintTop_toTopOf="@+id/tv_interval"
 			app:layout_constraintBottom_toBottomOf="@+id/tv_interval"
 			android:text="@string/main_interval_default_value" app:layout_constraintHorizontal_bias="0.0"
-	/>
+			android:textColor="@color/colorText"/>
 	<TextView
 			android:text="@string/main_key"
 			android:layout_width="wrap_content"
@@ -71,6 +71,7 @@
 			android:layout_marginStart="16dp" android:id="@+id/tv_interval" android:layout_marginTop="24dp"
 			app:layout_constraintTop_toBottomOf="@+id/tv_key"/>
 	<Button
+			style="@style/Widget.AppCompat.Button.Borderless"
 			android:text="@string/button_start"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
@@ -79,6 +80,7 @@
 			app:layout_constraintStart_toStartOf="@+id/guideline"
 			app:layout_constraintTop_toBottomOf="@+id/etv_interval" android:layout_marginTop="24dp"/>
 	<Button
+			style="@style/Widget.AppCompat.Button.Borderless"
 			android:text="@string/main_copy_link"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
@@ -87,6 +89,7 @@
 			app:layout_constraintStart_toStartOf="@+id/guideline"
 			android:layout_marginTop="8dp"/>
 	<Button
+			style="@style/Widget.AppCompat.Button.Borderless"
 			android:text="@string/main_stop"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
@@ -95,4 +98,12 @@
 			app:layout_constraintTop_toBottomOf="@+id/etv_interval"
 			android:layout_marginTop="24dp"
 			android:layout_marginStart="16dp"/>
+	<Button
+			style="@style/Widget.AppCompat.Button.Borderless"
+			android:text="Gen"
+			android:layout_width="70dp"
+			android:layout_height="wrap_content"
+			app:layout_constraintEnd_toEndOf="parent" android:id="@+id/button_generate"
+			app:layout_constraintTop_toTopOf="@+id/etv_key" app:layout_constraintBottom_toBottomOf="@+id/etv_key"
+			android:layout_marginEnd="8dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

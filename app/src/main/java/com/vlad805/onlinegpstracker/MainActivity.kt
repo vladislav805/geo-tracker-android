@@ -61,6 +61,10 @@ class MainActivity : AppCompatActivity() {
             copyText(url)
             Toast.makeText(this, "Link copied\n\n${url}", Toast.LENGTH_LONG).show()
         }
+
+        button_generate.setOnClickListener {
+            etv_key.setText(generateRandomKey())
+        }
     }
 
     private fun askPermissions() {
@@ -113,5 +117,13 @@ class MainActivity : AppCompatActivity() {
                 getPref().edit().putLong("interval", etv_interval.text.toString().toLong()).apply()
             }
         }
+    }
+
+    private fun generateRandomKey(): String {
+        val length = 16
+        val allowedChars = ('0'..'9') + ('a'..'f')
+        return (1..length)
+            .map { allowedChars.random() }
+            .joinToString("")
     }
 }
