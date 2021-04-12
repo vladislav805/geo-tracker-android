@@ -2,12 +2,17 @@ package com.vlad805.onlinegpstracker
 
 import android.Manifest
 import android.content.*
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.kotlinpermissions.KotlinPermissions
-import kotlinx.android.synthetic.main.activity_main.*
+import com.vlad805.onlinegpstracker.databinding.ActivityMainBinding
+
 
 enum class State {
     ASK_PERMISSIONS,
@@ -20,23 +25,29 @@ const val ENDPOINT = "https://gpsc.velu.ga"
 class MainActivity : AppCompatActivity() {
     private var state: State = State.ASK_PERMISSIONS
 
+    private lateinit var binding: ActivityMainBinding
+
     private fun getPref(): SharedPreferences {
         return getSharedPreferences("def", Context.MODE_PRIVATE)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+
+        binding = ActivityMainBinding.inflate(layoutInflater)
+
+        setContentView(binding.root)
 
         askPermissions()
 
-        button_start.setOnClickListener {
-            val endpoint = etv_endpoint.text.toString()
-            val key = etv_key.text.toString()
-            var interval = etv_interval.toString().toLongOrNull()
+        binding.buttonStart.setOnClickListener {
+            val endpoint = binding.etvEndpoint.text.toString()
+            val key = binding.etvKey.text.toString()
+            var interval = binding.etvInterval.toString().toLongOrNull()
             if (interval == null) {
                 interval = TRACK_PERIOD_TIME
             }
+
             val intent = Intent(this, TrackerService::class.java)
 
             intent.putExtra("endpoint", endpoint)
@@ -46,24 +57,41 @@ class MainActivity : AppCompatActivity() {
             setState(State.TRACKING)
         }
 
-        button_stop.setOnClickListener {
+        binding.buttonStop.setOnClickListener {
             stopService(Intent(this, TrackerService::class.java))
             setState(State.SETUP)
         }
 
         val pref = getPref()
-        etv_interval.setText(pref.getLong("interval", 10).toString())
-        etv_key.setText(pref.getString("key", "test"))
-        etv_endpoint.setText(pref.getString("endpoint", ENDPOINT))
+        binding.etvInterval.setText(pref.getLong("interval", 10).toString())
+        binding.etvKey.setText(pref.getString("key", "test"))
+        binding.etvEndpoint.setText(pref.getString("endpoint", ENDPOINT))
 
-        button_copy_link.setOnClickListener {
-            val url = "${etv_endpoint.text}/?key=${etv_key.text}";
+        binding.buttonCopyLink.setOnClickListener {
+            val url = "${binding.etvEndpoint.text}/?key=${binding.etvKey.text}"
             copyText(url)
             Toast.makeText(this, "Link copied\n\n${url}", Toast.LENGTH_LONG).show()
         }
 
-        button_generate.setOnClickListener {
-            etv_key.setText(generateRandomKey())
+        binding.buttonGenerate.setOnClickListener {
+            binding.etvKey.setText(generateRandomKey())
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val packageName = packageName
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                binding.buttonDisableOptimizations.setOnClickListener {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                }
+            } else {
+                binding.buttonDisableOptimizations.visibility = View.GONE
+            }
+        } else {
+            binding.buttonDisableOptimizations.visibility = View.GONE
         }
     }
 
@@ -84,37 +112,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun copyText(text: String) {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager?
-        val clip = ClipData.newPlainText("text", text);
-        clipboard?.primaryClip = clip;
+        val clip = ClipData.newPlainText("text", text)
+        clipboard?.setPrimaryClip(clip)
     }
 
     private fun setState(state: State) {
-        this.state = state;
+        this.state = state
+
         when (state) {
             State.ASK_PERMISSIONS -> {
-                button_start.visibility = View.VISIBLE
-                button_start.isEnabled = true
-                button_stop.isEnabled = false
+                binding.buttonStart.visibility = View.VISIBLE
+                binding.buttonStart.isEnabled = true
+                binding.buttonStop.isEnabled = false
             }
 
             State.SETUP -> {
-                etv_key.isEnabled = true
-                etv_interval.isEnabled = true
-                etv_endpoint.isEnabled = true
-                button_start.isEnabled = true
-                button_stop.isEnabled = false
+                binding.etvKey.isEnabled = true
+                binding.etvInterval.isEnabled = true
+                binding.etvEndpoint.isEnabled = true
+                binding.buttonStart.isEnabled = true
+                binding.buttonStop.isEnabled = false
             }
 
             State.TRACKING -> {
-                etv_key.isEnabled = false
-                etv_endpoint.isEnabled = false
-                etv_interval.isEnabled = false
-                button_start.isEnabled = false
-                button_stop.isEnabled = true
+                binding.etvKey.isEnabled = false
+                binding.etvEndpoint.isEnabled = false
+                binding.etvInterval.isEnabled = false
+                binding.buttonStart.isEnabled = false
+                binding.buttonStop.isEnabled = true
 
-                getPref().edit().putString("endpoint", etv_endpoint.text.toString()).apply()
-                getPref().edit().putString("key", etv_key.text.toString()).apply()
-                getPref().edit().putLong("interval", etv_interval.text.toString().toLong()).apply()
+                getPref().edit().putString("endpoint", binding.etvEndpoint.text.toString()).apply()
+                getPref().edit().putString("key", binding.etvKey.text.toString()).apply()
+                getPref().edit().putLong("interval", binding.etvInterval.text.toString().toLong()).apply()
             }
         }
     }

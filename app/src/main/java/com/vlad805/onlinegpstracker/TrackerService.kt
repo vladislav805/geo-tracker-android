@@ -26,22 +26,29 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.DateFormat.getTimeInstance
 import java.util.*
-import kotlin.collections.HashMap
 
-
-const val CHANNEL_ID = "chanId";
-const val NOTIFICATION_ID = 54894;
+fun isPermissionGranted(ctx: Context, id: String): Boolean {
+	return ContextCompat.checkSelfPermission(ctx, id) != PackageManager.PERMISSION_GRANTED
+}
 
 open class TrackerService : Service(), LocationChangesListener {
-	var mEndpoint = ""
-	var mKey: String = ""
-	var mDeltaDistance: Long = TRACK_MIN_DISTANCE
-	var mDeltaTime: Long = TRACK_PERIOD_TIME
+	companion object {
+		var isServiceStarted = false
+	}
+
+	private var mEndpoint = ""
+	private var mKey: String = ""
+	private var mDeltaDistance: Long = TRACK_MIN_DISTANCE
+	private var mDeltaTime: Long = TRACK_PERIOD_TIME
 
 	override fun onCreate() {
 		super.onCreate()
 
-		if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+		if (
+			isPermissionGranted(this, Manifest.permission.ACCESS_FINE_LOCATION) ||
+			isPermissionGranted(this, Manifest.permission.ACCESS_COARSE_LOCATION) ||
+			isPermissionGranted(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+		) {
 			Toast.makeText(this, "No access", Toast.LENGTH_LONG).show()
 		}
 
@@ -50,7 +57,7 @@ open class TrackerService : Service(), LocationChangesListener {
 
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 		if (intent == null) {
-			return START_STICKY;
+			return START_STICKY
 		}
 
 		Log.i("Service", "onStartCommand")
@@ -62,50 +69,50 @@ open class TrackerService : Service(), LocationChangesListener {
 			}
 
 			else -> {
-				mEndpoint = intent.getStringExtra("endpoint");
-				mKey = intent.getStringExtra("key");
-				mDeltaTime = intent.getLongExtra("interval", mDeltaTime);
+				mEndpoint = intent.getStringExtra("endpoint")!!
+				mKey = intent.getStringExtra("key")!!
+				mDeltaTime = intent.getLongExtra("interval", mDeltaTime)
 				showNotification("Click for stop tracking")
 				setupLocation()
-				registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+				registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 			}
 		}
 
 
-		return START_STICKY;
+		return START_STICKY
 	}
 
 	private fun showNotification(status: String) {
 		val stopIntent = Intent(this, TrackerService::class.java).apply {
 			action = "STOP"
 		}
+
 		val pendingIntent: PendingIntent = PendingIntent.getService(this, 0, stopIntent, 0)
 
-		val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-			.setSmallIcon(R.drawable.ic_my_location)
-			.setContentTitle("Online tracking on")
-			.setContentText(status)
-			.setContentIntent(pendingIntent)
-			.setPriority(NotificationCompat.PRIORITY_DEFAULT);
+		val builder = NotificationCompat.Builder(this, TRACKING_CHANNEL_ID).apply {
+			setSmallIcon(R.drawable.ic_my_location)
+			setContentTitle("Online tracking on")
+			setContentText(status)
+			setContentIntent(pendingIntent)
+			setNotificationSilent()
+			setAutoCancel(false)
+			setOngoing(true)
+			priority = NotificationCompat.PRIORITY_HIGH
+		}
 
 		with(NotificationManagerCompat.from(this)) {
-			// notificationId is a unique int for each notification that you must define
-
-			val notif = builder.build()
-
-			notify(NOTIFICATION_ID, notif)
-			//startForeground(NOTIFICATION_ID, notif)
+			notify(NOTIFICATION_ID, builder.build())
 		}
 	}
 
-	private var baseLocationStrategy: BaseLocationStrategy? = null;
+	private var baseLocationStrategy: BaseLocationStrategy? = null
 
 	override fun onDestroy() {
 		if (baseLocationStrategy != null) {
 			baseLocationStrategy!!.stopListeningForLocationChanges()
 		}
 
-		unregisterReceiver(mBatInfoReceiver);
+		unregisterReceiver(mBatInfoReceiver)
 
 		isServiceStarted = false
 
@@ -113,23 +120,22 @@ open class TrackerService : Service(), LocationChangesListener {
 	}
 
 	private fun setupLocation() {
-		val bls = LocationManagerStrategy.getInstance(this);
-		bls.setDisplacement(mDeltaDistance);
-		bls.setPeriodicalUpdateTime(mDeltaTime * 1000);
-		bls.setPeriodicalUpdateEnabled(true);
-		bls.startListeningForLocationChanges(this);
-		bls.startLocationUpdates();
-
-		baseLocationStrategy = bls;
+		val bls = LocationManagerStrategy.getInstance(this)
+		bls.setDisplacement(mDeltaDistance)
+		bls.setPeriodicalUpdateTime(mDeltaTime * 1000)
+		bls.setPeriodicalUpdateEnabled(true)
+		bls.startListeningForLocationChanges(this)
+		bls.startLocationUpdates()
+		baseLocationStrategy = bls
 	}
 
 	override fun onBind(intent: Intent): IBinder? {
-		return null;
+		return null
 	}
 
 	override fun onLocationChanged(location: Location?) {
 		if (location == null) {
-			return;
+			return
 		}
 
 		val map = HashMap<String, String>()
@@ -143,17 +149,17 @@ open class TrackerService : Service(), LocationChangesListener {
 		map["time"] = (System.currentTimeMillis() / 1000).toString()
 
 		if (battery >= 0) {
-			map["battery"] = battery.toString();
+			map["battery"] = battery.toString()
 		}
 
-		Thread(Runnable {
+		Thread {
 			try {
 				sendLocation(map)
 			} catch (e: Throwable) {
 				e.printStackTrace()
-				showNotification("Location send failure: ${e.toString()}")
+				showNotification("Location send failure: $e")
 			}
-		}).start()
+		}.start()
 	}
 
 	override fun onFailure(reason: String?) {
@@ -170,8 +176,8 @@ open class TrackerService : Service(), LocationChangesListener {
 
 	private fun sendLocation(map: Map<String, String>) {
 		val qs = urlEncodeUTF8(map)
-		val url = "${mEndpoint}/api/set?$qs";
-		Log.i("sendLoc", url);
+		val url = "${mEndpoint}/api/set?$qs"
+		Log.i("sendLoc", url)
 		val mURL = URL(url)
 
 		with(mURL.openConnection() as HttpURLConnection) {
@@ -200,16 +206,12 @@ open class TrackerService : Service(), LocationChangesListener {
 		}
 	}
 
-	companion object {
-		var isServiceStarted = false
-	}
-
-	var battery: Int = -1;
+	var battery: Int = -1
 
 	private val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
 		override fun onReceive(ctxt: Context?, intent: Intent) {
 			val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-			battery = level;
+			battery = level
 		}
 	}
 }

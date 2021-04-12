@@ -100,10 +100,18 @@
 			android:layout_marginStart="16dp"/>
 	<Button
 			style="@style/Widget.AppCompat.Button.Borderless"
-			android:text="Gen"
+			android:text="@string/main_gen"
 			android:layout_width="70dp"
 			android:layout_height="wrap_content"
 			app:layout_constraintEnd_toEndOf="parent" android:id="@+id/button_generate"
 			app:layout_constraintTop_toTopOf="@+id/etv_key" app:layout_constraintBottom_toBottomOf="@+id/etv_key"
 			android:layout_marginEnd="8dp"/>
+	<Button
+			style="@style/Widget.AppCompat.Button.Borderless"
+			android:id="@+id/button_disable_optimizations"
+			android:text="@string/main_disable_optimizations"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+			app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="8dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

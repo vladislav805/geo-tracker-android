@@ -7,4 +7,8 @@
     <string name="main_stop">Stop</string>
     <string name="main_copy_link">Copy link</string>
     <string name="main_endpoint">Endpoint</string>
+    <string name="main_disable_optimizations">Disable optimizations</string>
+    <string name="main_gen">Gen</string>
+    <string name="channel_name">Tracker service</string>
+    <string name="channel_description">Main tracker service</string>
 </resources>
