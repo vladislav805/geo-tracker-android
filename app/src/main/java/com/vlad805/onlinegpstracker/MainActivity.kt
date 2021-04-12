@@ -1,6 +1,7 @@
 package com.vlad805.onlinegpstracker
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.*
 import android.net.Uri
 import android.os.Build
@@ -12,7 +13,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.kotlinpermissions.KotlinPermissions
 import com.vlad805.onlinegpstracker.databinding.ActivityMainBinding
-
 
 enum class State {
     ASK_PERMISSIONS,
@@ -27,10 +27,13 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+    private val RESULT_ID_DISABLE_OPTIMIZATION = 4795
+
     private fun getPref(): SharedPreferences {
         return getSharedPreferences("def", Context.MODE_PRIVATE)
     }
 
+    @SuppressLint("BatteryLife")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -38,23 +41,8 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
-        askPermissions()
-
         binding.buttonStart.setOnClickListener {
-            val endpoint = binding.etvEndpoint.text.toString()
-            val key = binding.etvKey.text.toString()
-            var interval = binding.etvInterval.toString().toLongOrNull()
-            if (interval == null) {
-                interval = TRACK_PERIOD_TIME
-            }
-
-            val intent = Intent(this, TrackerService::class.java)
-
-            intent.putExtra("endpoint", endpoint)
-            intent.putExtra("key", key)
-            intent.putExtra("interval", interval)
-            startService(intent)
-            setState(State.TRACKING)
+            askPermissions()
         }
 
         binding.buttonStop.setOnClickListener {
@@ -69,7 +57,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.buttonCopyLink.setOnClickListener {
             val url = "${binding.etvEndpoint.text}/?key=${binding.etvKey.text}"
-            copyText(url)
+            copyText(this, url)
             Toast.makeText(this, "Link copied\n\n${url}", Toast.LENGTH_LONG).show()
         }
 
@@ -77,43 +65,44 @@ class MainActivity : AppCompatActivity() {
             binding.etvKey.setText(generateRandomKey())
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val packageName = packageName
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                binding.buttonDisableOptimizations.setOnClickListener {
-                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                    intent.data = Uri.parse("package:$packageName")
-                    startActivity(intent)
-                }
-            } else {
-                binding.buttonDisableOptimizations.visibility = View.GONE
-            }
-        } else {
-            binding.buttonDisableOptimizations.visibility = View.GONE
-        }
+        updateButtonDisableOptimization()
     }
 
     private fun askPermissions() {
-        KotlinPermissions.with(this)
-            .permissions(Manifest.permission.ACCESS_FINE_LOCATION)
-            .onAccepted {
-                setState(if (!TrackerService.isServiceStarted) State.SETUP else State.TRACKING)
+        with(KotlinPermissions.with(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                permissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            } else {
+                permissions(Manifest.permission.ACCESS_FINE_LOCATION)
             }
-            .onDenied {
-
+            onAccepted {
+                setState(State.SETUP)
+                startTrackerService()
             }
-            .onForeverDenied {
-
+            onDenied {
+                setState(State.ASK_PERMISSIONS)
             }
-            .ask()
+            ask()
+        }
     }
 
-    private fun copyText(text: String) {
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager?
-        val clip = ClipData.newPlainText("text", text)
-        clipboard?.setPrimaryClip(clip)
+    private fun startTrackerService() {
+        val endpoint = binding.etvEndpoint.text.toString()
+        val key = binding.etvKey.text.toString()
+        var interval = binding.etvInterval.toString().toLongOrNull()
+
+        if (interval == null) {
+            interval = TRACK_PERIOD_TIME
+        }
+
+        val intent = Intent(this, TrackerService::class.java).apply {
+            putExtra("endpoint", endpoint)
+            putExtra("key", key)
+            putExtra("interval", interval)
+        }
+
+        startService(intent)
+        setState(State.TRACKING)
     }
 
     private fun setState(state: State) {
@@ -127,32 +116,63 @@ class MainActivity : AppCompatActivity() {
             }
 
             State.SETUP -> {
-                binding.etvKey.isEnabled = true
-                binding.etvInterval.isEnabled = true
-                binding.etvEndpoint.isEnabled = true
+                setTextAreasEnabled(true)
                 binding.buttonStart.isEnabled = true
                 binding.buttonStop.isEnabled = false
             }
 
             State.TRACKING -> {
-                binding.etvKey.isEnabled = false
-                binding.etvEndpoint.isEnabled = false
-                binding.etvInterval.isEnabled = false
+                setTextAreasEnabled(false)
                 binding.buttonStart.isEnabled = false
                 binding.buttonStop.isEnabled = true
 
-                getPref().edit().putString("endpoint", binding.etvEndpoint.text.toString()).apply()
-                getPref().edit().putString("key", binding.etvKey.text.toString()).apply()
-                getPref().edit().putLong("interval", binding.etvInterval.text.toString().toLong()).apply()
+                val pref = getPref().edit()
+                pref.putString("endpoint", binding.etvEndpoint.text.toString())
+                pref.putString("key", binding.etvKey.text.toString())
+                pref.putLong("interval", binding.etvInterval.text.toString().toLong())
+                pref.apply()
             }
         }
     }
 
-    private fun generateRandomKey(): String {
-        val length = 16
-        val allowedChars = ('0'..'9') + ('a'..'f')
-        return (1..length)
-            .map { allowedChars.random() }
-            .joinToString("")
+    private fun setTextAreasEnabled(state: Boolean) {
+        binding.etvKey.isEnabled = state
+        binding.etvEndpoint.isEnabled = state
+        binding.etvInterval.isEnabled = state
+    }
+
+    @SuppressLint("BatteryLife")
+    private fun updateButtonDisableOptimization() {
+        // If old device, hide button
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            binding.buttonDisableOptimizations.visibility = View.GONE
+            return
+        }
+
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+
+        // If already optimizations are disabled
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            binding.buttonDisableOptimizations.visibility = View.GONE
+            return
+        }
+
+        // If enabled, show button and set click listener
+        binding.buttonDisableOptimizations.setOnClickListener {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            intent.data = Uri.parse("package:$packageName")
+            startActivityForResult(intent, RESULT_ID_DISABLE_OPTIMIZATION)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        when (requestCode) {
+            RESULT_ID_DISABLE_OPTIMIZATION -> {
+                updateButtonDisableOptimization()
+                return
+            }
+        }
+
+        super.onActivityResult(requestCode, resultCode, data)
     }
 }

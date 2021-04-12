@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.location.Location
 import android.os.BatteryManager
 import android.os.IBinder
@@ -15,7 +14,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import com.location.bestlocationstrategy.BaseLocationStrategy
 import com.location.bestlocationstrategy.LocationChangesListener
 import com.location.bestlocationstrategy.LocationManagerStrategy
@@ -26,10 +24,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.DateFormat.getTimeInstance
 import java.util.*
-
-fun isPermissionGranted(ctx: Context, id: String): Boolean {
-	return ContextCompat.checkSelfPermission(ctx, id) != PackageManager.PERMISSION_GRANTED
-}
 
 open class TrackerService : Service(), LocationChangesListener {
 	companion object {
@@ -49,7 +43,7 @@ open class TrackerService : Service(), LocationChangesListener {
 			isPermissionGranted(this, Manifest.permission.ACCESS_COARSE_LOCATION) ||
 			isPermissionGranted(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
 		) {
-			Toast.makeText(this, "No access", Toast.LENGTH_LONG).show()
+			Toast.makeText(this, "No permissions for location", Toast.LENGTH_LONG).show()
 		}
 
 		isServiceStarted = true
@@ -77,7 +71,6 @@ open class TrackerService : Service(), LocationChangesListener {
 				registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 			}
 		}
-
 
 		return START_STICKY
 	}
@@ -120,10 +113,11 @@ open class TrackerService : Service(), LocationChangesListener {
 	}
 
 	private fun setupLocation() {
-		val bls = LocationManagerStrategy.getInstance(this)
-		bls.setDisplacement(mDeltaDistance)
-		bls.setPeriodicalUpdateTime(mDeltaTime * 1000)
-		bls.setPeriodicalUpdateEnabled(true)
+		val bls = LocationManagerStrategy.getInstance(this).apply {
+			setDisplacement(mDeltaDistance)
+			setPeriodicalUpdateTime(mDeltaTime * 1000)
+			setPeriodicalUpdateEnabled(true)
+		}
 		bls.startListeningForLocationChanges(this)
 		bls.startLocationUpdates()
 		baseLocationStrategy = bls
@@ -140,16 +134,18 @@ open class TrackerService : Service(), LocationChangesListener {
 
 		val map = HashMap<String, String>()
 
-		map["key"] = mKey
-		map["lat"] = location.latitude.toString()
-		map["lng"] = location.longitude.toString()
-		map["speed"] = (3.6 * location.speed).toString()
-		map["bearing"] = location.bearing.toString()
-		map["accuracy"] = location.accuracy.toString()
-		map["time"] = (System.currentTimeMillis() / 1000).toString()
+		with(location) {
+			map["key"] = mKey
+			map["lat"] = latitude.toString()
+			map["lng"] = longitude.toString()
+			map["speed"] = (3.6 * speed).toString()
+			map["bearing"] = bearing.toString()
+			map["accuracy"] = accuracy.toString()
+			map["time"] = (System.currentTimeMillis() / 1000).toString()
+		}
 
-		if (battery >= 0) {
-			map["battery"] = battery.toString()
+		if (mBattery >= 0) {
+			map["battery"] = mBattery.toString()
 		}
 
 		Thread {
@@ -176,7 +172,7 @@ open class TrackerService : Service(), LocationChangesListener {
 
 	private fun sendLocation(map: Map<String, String>) {
 		val qs = urlEncodeUTF8(map)
-		val url = "${mEndpoint}/api/set?$qs"
+		val url = "$mEndpoint/api/set?$qs"
 		Log.i("sendLoc", url)
 		val mURL = URL(url)
 
@@ -206,12 +202,11 @@ open class TrackerService : Service(), LocationChangesListener {
 		}
 	}
 
-	var battery: Int = -1
+	private var mBattery: Int = -1
 
 	private val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
 		override fun onReceive(ctxt: Context?, intent: Intent) {
-			val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-			battery = level
+			mBattery = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
 		}
 	}
 }
